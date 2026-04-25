@@ -13,7 +13,7 @@
 #include <setjmp.h>
 #include <dirent.h>
 
-#define CONFIG_PATH "/.config/kfetch/kfetch.conf"
+#define CONFIG_PATH "/.config/kaboomfetch/kaboomfetch.conf"
 
 #define RESET    "\033[0m"
 #define BOLD     "\033[1m"
@@ -47,6 +47,8 @@ typedef enum {
     DISTRO_DEVUAN,
     DISTRO_PARABOLA,
     DISTRO_BLACKARCH,
+    DISTRO_LFS,
+    DISTRO_KABOOM,
     DISTRO_UNKNOWN
 } DistroID;
 
@@ -408,6 +410,63 @@ static const char *lines_blackarch[] = {
     " .`                " BCYAN "/" RESET "                `/",
 };
 
+static const char *lines_lfs[] = {
+    "            :@@@@@@@:",
+    "            @@@@@@@@@-",
+    "    .:%.    @@@@@@@@@+.       @%",
+    "   *@@@%+:  :@@@@@@@%=: .=%@@@@@@=",
+    "  :@@@@@@##@@@@@@@@@%*+%@%+@@@@@@@",
+    "  @@####+@@@@@@@%:######=@@@@@@@@@-",
+    " *@%######.@@@@@##########-@@@@@@@@#.",
+    " %@-#.@=:##+@@@@-###%@:=###*#*+=-+#:",
+    " @@.#@@*=:#-%%**-##%@@%**####=-",
+    " @@-#@@@@+.-...:=.#%@@@@%####-",
+    " %@%##*#:.o.....o...-%@####@+    -:",
+    " +@@*#....................+@@@@@@@+",
+    "  @%:....................._:@@@@@@@=.",
+    "  .=:...............__*-=`. =@@@@@@#=.",
+    "   :+:....:==*__*-=`:..==-:#@@@@@%+:",
+    "     .--=-:  +..::.....-:    =%@*=:",
+    "              :........-",
+    "                .:...--.",
+};
+
+static const char *lines_kaboom[] = {
+    "                                                  -==--      ",
+    "                                             -==---=-=--=-=  ",
+    "                                              ----==-=---=-  ",
+    "                                               -=--  --=---- ",
+    "                                                  #    ==---=",
+    "                                      ##        *#*#* -=-----",
+    "                  *#*#*#*##*####    ##***#    ##*### -==-==  ",
+    "             *********************##******####**##     -=-=- ",
+    "          ####*****************************##*##             ",
+    "        *##******+====***********************##*             ",
+    "      **#*****===---=+*************************#*#           ",
+    "    #*#****+==--=+*********************************          ",
+    "   *#*****==-=+**********************************#*          ",
+    "  ##****+=-=+**********************************###           ",
+    " *#****+=-=+**********************************##             ",
+    " #****+=-=*************************************##            ",
+    "******=-=+****************************************           ",
+    "#*****==+***************************************##           ",
+    "#***********************************************#*           ",
+    "*************************************************#           ",
+    "************************************************##           ",
+    "#***********************************************##           ",
+    "#***********************************************##           ",
+    " **********************************************##            ",
+    " ************************************************            ",
+    "  ********************************************#*             ",
+    "   *******************************************#              ",
+    "    *#*************************************###               ",
+    "     ###**********************************#*                 ",
+    "       *********************************#**                  ",
+    "         *#****************************##                    ",
+    "            ####******************##*#                       ",
+    "               ###*###*########*#*                           ",
+};
+
 static Distro distros[] = {
     { DISTRO_ARCH,               "arch",               BBLUE,    BLUE,    lines_arch,                    19, 37 },
     { DISTRO_ARTIX,              "artix",              BCYAN,    WHITE,   lines_artix,                   20, 39 },
@@ -426,6 +485,8 @@ static Distro distros[] = {
     { DISTRO_DEVUAN,             "devuan",             BRED,     WHITE,   lines_devuan,                  14, 51 },
     { DISTRO_PARABOLA,           "parabola",           BCYAN,    WHITE,   lines_parabola,                16, 57 },
     { DISTRO_BLACKARCH,          "blackarch",          BRED,     BCYAN,   lines_blackarch,               21, 50 },
+    { DISTRO_LFS,                "lfs",                BCYAN,    WHITE,   lines_lfs,                     18, 52 },
+    { DISTRO_KABOOM,             "kaboom",             BRED,     BYELLOW, lines_kaboom,                  33, 85 },
     { DISTRO_UNKNOWN,            "unknown",            BCYAN,    WHITE,   lines_unknown,                  7, 16 },
 };
 
@@ -447,21 +508,37 @@ typedef struct {
     int  show_terminal;
 } Config;
 
-static Config cfg = {
-    .user        = "user",
-    .host        = "host",
-    .show_os     = 1,
-    .show_kernel = 1,
-    .show_shell  = 1,
-    .show_ram    = 0,
-    .show_uptime = 0,
-    .show_cpu    = 0,
-    .show_disk   = 0,
-    .show_packages = 0,
-    .show_de     = 0,
-    .show_wm     = 0,
-    .show_terminal = 0,
-};
+static Config cfg;
+
+static void set_default_config(void) {
+    char *user = getenv("USER");
+    if (user) {
+        strncpy(cfg.user, user, sizeof(cfg.user) - 1);
+        cfg.user[sizeof(cfg.user) - 1] = '\0';
+    } else {
+        strcpy(cfg.user, "user");
+    }
+
+    char hostname[64];
+    if (gethostname(hostname, sizeof(hostname)) == 0) {
+        strncpy(cfg.host, hostname, sizeof(cfg.host) - 1);
+        cfg.host[sizeof(cfg.host) - 1] = '\0';
+    } else {
+        strcpy(cfg.host, "host");
+    }
+
+    cfg.show_os = 1;
+    cfg.show_kernel = 1;
+    cfg.show_shell = 1;
+    cfg.show_ram = 0;
+    cfg.show_uptime = 0;
+    cfg.show_cpu = 0;
+    cfg.show_disk = 0;
+    cfg.show_packages = 0;
+    cfg.show_de = 0;
+    cfg.show_wm = 0;
+    cfg.show_terminal = 0;
+}
 
 static void get_distro_name(char *out, size_t len) {
     FILE *f = fopen("/etc/os-release", "r");
@@ -525,6 +602,7 @@ static DistroID detect_distro(void) {
     if (strstr(id, "devuan"))      return DISTRO_DEVUAN;
     if (strstr(id, "parabola"))    return DISTRO_PARABOLA;
     if (strstr(id, "blackarch"))   return DISTRO_BLACKARCH;
+    if (strstr(id, "lfs"))         return DISTRO_LFS;
 
     if (strstr(id, "opensuse")) {
         if (strstr(version_id, "tumbleweed") || strstr(version_id, "202"))
@@ -691,14 +769,14 @@ static void save_config(void) {
     char dir[512];
     char *home = getenv("HOME");
     if (!home) home = "/root";
-    snprintf(dir, sizeof(dir), "%s/.config/kfetch", home);
+    snprintf(dir, sizeof(dir), "%s/.config/kaboomfetch", home);
     char cmd[600];
     snprintf(cmd, sizeof(cmd), "mkdir -p %s", dir);
     system(cmd);
 
     FILE *f = fopen(config_path(), "w");
     if (!f) { printf("Could not save config!\n"); return; }
-    fprintf(f, "# kfetch config\n");
+    fprintf(f, "# kaboomfetch config\n");
     fprintf(f, "user=%s\n",           cfg.user);
     fprintf(f, "host=%s\n",           cfg.host);
     fprintf(f, "show_os=%d\n",        cfg.show_os);
@@ -780,8 +858,8 @@ static void draw_tui(int step, int sel, int scroll, char *input, int input_len) 
         printf(BOLD BGREEN "  ✓ Setup complete!\n\n" RESET);
         printf("  user:   " BOLD RED  "%s" RESET "\n", cfg.user);
         printf("  host:   " BOLD BLUE "%s" RESET "\n", cfg.host);
-        printf("  Config saved to " CYAN "~/.config/kfetch/kfetch.conf" RESET "\n\n");
-        printf(BOLD WHITE "  Press any key to launch kfetch...\n" RESET);
+        printf("  Config saved to " CYAN "~/.config/kaboomfetch/kaboomfetch.conf" RESET "\n\n");
+        printf(BOLD WHITE "  Press any key to launch kaboomfetch...\n" RESET);
     }
 }
 
@@ -1149,9 +1227,9 @@ static void open_config(void) {
 }
 
 static void print_help(void) {
-    printf(BOLD "kfetch" RESET " - lightweight system fetch\n\n");
+    printf(BOLD "kaboomfetch" RESET " - lightweight system fetch\n\n");
     printf(BOLD "USAGE\n" RESET);
-    printf("  kfetch [options]\n\n");
+    printf("  kaboomfetch [options]\n\n");
     printf(BOLD "OPTIONS\n" RESET);
     printf("  " BOLD "--logo" RESET " <distro>      Force a specific distro logo\n");
     printf("  " BOLD "--logo" RESET " <path>        Render a JPG or PNG as ASCII art logo\n");
@@ -1160,14 +1238,14 @@ static void print_help(void) {
     printf("  " BOLD "--config" RESET "              Open the config file in $EDITOR\n");
     printf("  " BOLD "--help" RESET "                Show this message\n\n");
     printf(BOLD "DISTRO LOGOS\n" RESET);
-    printf("  arch artix alpine bedrock cachyos fedora debian ubuntu gentoo opensuse opensuse-tumbleweed opensuse-leap void windows devuan parabola blackarch\n\n");
+    printf("  arch artix alpine bedrock cachyos fedora debian ubuntu gentoo opensuse opensuse-leap opensuse-tumbleweed void windows devuan parabola blackarch lfs kaboom\n\n");
     printf(BOLD "EXAMPLES\n" RESET);
-    printf("  kfetch\n");
-    printf("  kfetch --logo arch\n");
-    printf("  kfetch --logo opensuse-tumbleweed\n");
-    printf("  kfetch --logo ~/pictures/avatar.png --size 40x20\n");
-    printf("  kfetch --setup\n");
-    printf("  kfetch --config\n");
+    printf("  kaboomfetch\n");
+    printf("  kaboomfetch --logo arch\n");
+    printf("  kaboomfetch --logo kaboom\n");
+    printf("  kaboomfetch --logo ~/pictures/avatar.png --size 40x20\n");
+    printf("  kaboomfetch --setup\n");
+    printf("  kaboomfetch --config\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -1179,6 +1257,8 @@ int main(int argc, char *argv[]) {
     int         img_cols   = 0;   
     int         img_rows   = 0;
 
+    set_default_config();
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--setup") == 0) {
             do_setup = 1;
@@ -1188,25 +1268,24 @@ int main(int argc, char *argv[]) {
             do_help = 1;
         } else if (strcmp(argv[i], "--size") == 0) {
             if (i + 1 >= argc) {
-                fprintf(stderr, "kfetch: --size requires an argument (e.g. 40x20)\n");
+                fprintf(stderr, "kaboomfetch: --size requires an argument (e.g. 40x20)\n");
                 return 1;
             }
             if (sscanf(argv[++i], "%dx%d", &img_cols, &img_rows) != 2
                 || img_cols <= 0 || img_rows <= 0) {
-                fprintf(stderr, "kfetch: invalid size '%s', expected WxH (e.g. 40x20)\n", argv[i]);
+                fprintf(stderr, "kaboomfetch: invalid size '%s', expected WxH (e.g. 40x20)\n", argv[i]);
                 return 1;
             }
         } else if (strcmp(argv[i], "--logo") == 0) {
             if (i + 1 >= argc) {
-                fprintf(stderr, "kfetch: --logo requires an argument\n");
-                fprintf(stderr, "  distros: arch, artix, alpine, bedrock, cachyos, fedora, debian, ubuntu, gentoo, opensuse, opensuse-tumbleweed, opensuse-leap, void, windows, devuan, parabola, blackarch\n");
+                fprintf(stderr, "kaboomfetch: --logo requires an argument\n");
+                fprintf(stderr, "  distros: arch, artix, alpine, bedrock, cachyos, fedora, debian, ubuntu, gentoo, opensuse, opensuse-leap, opensuse-tumbleweed, void, windows, devuan, parabola, blackarch, lfs, kaboom\n");
                 fprintf(stderr, "  or a path to a .jpg/.png file\n");
                 return 1;
             }
             const char *arg = argv[++i];
             forced = get_distro_by_name(arg);
-            if (!forced) img_path = arg;ten in C. It displays a distribution ASCII logo alongside key system details directly in your terminal.
-
+            if (!forced) img_path = arg;
         }
     }
 
@@ -1241,7 +1320,7 @@ int main(int argc, char *argv[]) {
             if (!ok) ok = load_jpg(real, &img);
         }
         if (!ok) {
-            fprintf(stderr, "kfetch: could not load image: %s\n", real);
+            fprintf(stderr, "kaboomfetch: could not load image: %s\n", real);
             return 1;
         }
         if (img_cols == 0 || img_rows == 0) {
